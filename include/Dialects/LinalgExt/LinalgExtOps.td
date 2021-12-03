@@ -153,8 +153,17 @@ def LinalgExt_TileOp : LinalgExt_PureOp<"tile",
                        Variadic<AnyRankedTensor>:$outSlices);
   let results = (outs Variadic<AnyType>:$results);
   let regions = (region SizedRegion<1>:$region);
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins "Value":$tileSizes, "ValueRange":$outSlices,
+      CArg<"function_ref<void(OpBuilder &, Location, Value, Value, ValueRange)>",
+           "nullptr">)>
+  ];
 
   let extraClassDeclaration = [{
+    using TileOpBodyBuilderFn =
+      function_ref<void(OpBuilder &, Location, Value /*offset*/, Value /*size*/,
+                        ValueRange /*outs*/)>;
     // TODO: helper for getting named region args without magic constants etc.
   }];
 

@@ -145,6 +145,27 @@ Operation *ReverseOp::getTiledImplementation(OpBuilder &builder,
 // TileOp
 //===----------------------------------------------------------------------===//
 
+void TileOp::build(mlir::OpBuilder &builder, mlir::OperationState &result,
+                   Value tileSize, ValueRange outSlices,
+                   TileOp::TileOpBodyBuilderFn bodyBuilder) {
+  result.addOperands(tileSize);
+  result.addOperands(outSlices);
+  result.addTypes(outSlices.getType());
+
+  Region *bodyRegion = result.addRegion();
+  bodyRegion->push_back(new Block);
+  Block &bodyBlock = bodyRegion->front();
+  bodyBlock.addArgument(builder.getIndexType());
+  bodyBlock.addArgument(builder.getIndexType());
+  bodyBlock.addArguments(outSlices.getType());
+
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPointToStart(&bodyBlock);
+  bodyBuilder(builder, result.location, bodyBlock.getArgument(0),
+              bodyBlock.getArgument(1), bodyBlock.getArguments().drop_front(2));
+}
+
+// TODO(#81): Impl me.
 static LogicalResult verify(TileOp op) { return success(); }
 
 static void print(OpAsmPrinter &p, TileOp op) {
