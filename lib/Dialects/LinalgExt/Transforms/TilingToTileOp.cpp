@@ -26,13 +26,22 @@ SmallVector<Value> tileToTileOp(PatternRewriter &rewriter, TilingInterface op,
                                 Value tileSize) {
   Location loc = op->getLoc();
   OpBuilder::InsertionGuard g(rewriter);
+  // TODO: Handle the case where the `loopRanges` are empty.
+  SmallVector<Range> loopRanges = op.getLoopBounds(rewriter);
+  assert(loopRanges.size() >= 1 &&
+         "expected at least a single loop in operation");
   auto tileOp = rewriter.create<linalg_ext::TileOp>(
       loc, tileSize, op.getDestinationOperands(rewriter),
       [&](OpBuilder &b, Location loc, Value offset, Value size,
           ValueRange outSlices) {
         // TODO: support `getTiledImplementation` with >1 produced tiled ops.
+        SmallVector<OpFoldResult> tiledOffsets = {offset}, tiledSizes = {size};
+        for (unsigned i = 1; i < loopRanges.size(); ++i) {
+          tiledOffsets.push_back(loopRanges[i].offset);
+          tiledSizes.push_back(loopRanges[i].size);
+        }
         Operation *tiledOp =
-            op.getTiledImplementation(b, outSlices, {offset}, {size});
+            op.getTiledImplementation(b, outSlices, tiledOffsets, tiledSizes);
         b.create<linalg_ext::TileYieldOp>(loc, tiledOp->getResults());
       });
   return tileOp->getResults();
@@ -56,6 +65,11 @@ struct OpTilingPattern : public OpInterfaceRewritePattern<TilingInterface> {
       return failure();
 
     /// Currently only handle operations with all parallel iterator types.
+    auto loopIteratorTypes = op.getLoopIteratorTypes();
+    if (loopIteratorTypes.empty()) {
+      // Scalar operation, nothing to do, so just return.
+      return failure();
+    }
     if (llvm::any_of(op.getLoopIteratorTypes(), [](StringRef iteratorType) {
           return iteratorType != getParallelIteratorTypeName();
         })) {
@@ -85,11 +99,10 @@ private:
 };
 
 /// Pass to test the tiling tranforamtion.
-struct LinalgExtTilingToTileOp : public LinalgExtTilingToTileOpBase<LinalgExtTilingToTileOp> {
+struct LinalgExtTilingToTileOp
+    : public LinalgExtTilingToTileOpBase<LinalgExtTilingToTileOp> {
   LinalgExtTilingToTileOp() = default;
-  LinalgExtTilingToTileOp(int64_t tileSize) {
-    this->tileSize = tileSize;
-  }
+  LinalgExtTilingToTileOp(int64_t tileSize) { this->tileSize = tileSize; }
   void runOnOperation() override;
 };
 } // namespace
@@ -100,7 +113,8 @@ void LinalgExtTilingToTileOp::runOnOperation() {
   FuncOp funcOp = getOperation();
 
   RewritePatternSet patterns(&getContext());
-  auto options = linalg::LinalgTilingOptions().setTileSizes(ArrayRef<int64_t>{tileSize});
+  auto options =
+      linalg::LinalgTilingOptions().setTileSizes(ArrayRef<int64_t>{tileSize});
   patterns.insert<OpTilingPattern>(&getContext(), options);
 
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
