@@ -1,4 +1,4 @@
-// RUN: mlir-proto-opt %s -linalg-ext-tiling-to-tile-op="tile-size=10" -linalg-tile-to-sequential-for -verify-each=0 | FileCheck %s
+// RUN: mlir-proto-opt %s -linalg-ext-tiling-to-tile-op="tile-size=10" -linalg-tile-to-sequential-for | FileCheck %s
 
 func @reverse_1d_tensor(%arg0 : tensor<?x?xf32>) -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index
@@ -25,7 +25,7 @@ func @reverse_1d_tensor(%arg0 : tensor<?x?xf32>) -> tensor<?x?xf32> {
 }
 
 func @matmul(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>) -> (tensor<?x?xf32>) {
-  // TODO: LinalgOp needs interface composition to implemented the TilingInterface.
+  // TODO: Add CHECK*
   %D = linalg.matmul ins(%A, %B: tensor<?x?xf32>, tensor<?x?xf32>) outs(%C: tensor<?x?xf32>) -> tensor<?x?xf32>
   return %D: tensor<?x?xf32>
 }

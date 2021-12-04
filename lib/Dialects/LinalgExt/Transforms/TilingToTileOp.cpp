@@ -64,22 +64,24 @@ struct OpTilingPattern : public OpInterfaceRewritePattern<TilingInterface> {
     if (op->getNumResults() != 1)
       return failure();
 
+    // Get rank and tile sizes.
+    SmallVector<Value> tileSizes =
+        options.tileSizeComputationFunction(rewriter, op);
+    assert(tileSizes.size() == 1 && "expected a single tile size");
+
     /// Currently only handle operations with all parallel iterator types.
     auto loopIteratorTypes = op.getLoopIteratorTypes();
     if (loopIteratorTypes.empty()) {
       // Scalar operation, nothing to do, so just return.
       return failure();
     }
-    if (llvm::any_of(op.getLoopIteratorTypes(), [](StringRef iteratorType) {
-          return iteratorType != getParallelIteratorTypeName();
-        })) {
+    ArrayRef<StringRef> loopIteratorTypesRef(loopIteratorTypes);
+    if (llvm::any_of(loopIteratorTypesRef.take_front(tileSizes.size()),
+                     [](StringRef iteratorType) {
+                       return iteratorType != getParallelIteratorTypeName();
+                     })) {
       return failure();
     }
-
-    // Get rank and tile sizes.
-    SmallVector<Value> tileSizes =
-        options.tileSizeComputationFunction(rewriter, op);
-    assert(tileSizes.size() == 1 && "expected a single tile size");
 
     rewriter.replaceOp(op, tileToTileOp(rewriter, op, tileSizes.front()));
 
@@ -104,6 +106,9 @@ struct LinalgExtTilingToTileOp
   LinalgExtTilingToTileOp() = default;
   LinalgExtTilingToTileOp(int64_t tileSize) { this->tileSize = tileSize; }
   void runOnOperation() override;
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<linalg_ext::LinalgExtDialect>();
+  }
 };
 } // namespace
 

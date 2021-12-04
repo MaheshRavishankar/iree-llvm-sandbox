@@ -35,6 +35,7 @@ class LinalgExt_Op<string mnemonic, list<OpTrait> traits = []> :
 def LinalgExt_ReverseOp : LinalgExt_Op<"reverse", [
     AttrSizedOperandSegments,
     DeclareOpInterfaceMethods<TilingInterface, [
+        "getLoopIteratorTypes",
         "getLoopBounds",
         "getTiledImplementation"]>]> {
   let summary = "Reverse operator";

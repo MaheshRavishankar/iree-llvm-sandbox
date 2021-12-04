@@ -1,6 +1,7 @@
 add_mlir_library(MLIRLinalgExtTransforms
   InParallelToAsync.cpp
   InParallelToSequentialFor.cpp
+  TilingExternalModels.cpp
   TileToSequentialFor.cpp
   TileToInParallel.cpp
   Tiling.cpp
